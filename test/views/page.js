@@ -436,6 +436,36 @@ const page = `
                     </div>
                 </div> <!-- end power-meter settings -->
 
+                <!-- race controller settings (Zwift Click) -->
+                <div class="settings-card row-border">
+                    <div class="settings-card-cont">
+                        <connection-switch id="switch-race-controller" class="switch-connection switch" name="ble:race-controller">
+                            <div class="switch--indicator off"></div>
+                            <div class="switch--label">Zwift Click</div>
+                        </connection-switch>
+                        <div class="device-info">
+                            <div class="protocol-switch">
+                                <svg class="icon" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24">
+                                    <path d="M0 0h24v24H0V0z" fill="none"/>
+                                    <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
+                                </svg>
+                            </div>
+                            <div class="info-cell">
+                                <h3 class="">Name</h3>
+                                <effect-display id="race-controller-name"
+                                                class="info-cell-value"
+                                                effect="ble:race-controller:name">--</effect-display>
+                            </div>
+                            <div class="info-cell">
+                                <h3 class="">Button / Action</h3>
+                                <effect-display id="race-controller-action"
+                                                class="info-cell-value"
+                                                effect="ble:race-controller:action">--</effect-display>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- end race controller settings -->
+
                 <!-- hrm settings -->
                 <div class="settings-card row-border">
                     <div class="settings-card-cont">

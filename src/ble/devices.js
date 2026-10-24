@@ -33,10 +33,25 @@ const coreTemp = ReactiveConnectable({
     filter: webBle.filters.coreTemp(),
 });
 
-// export {
-//     controllabe,
-//     heartRateMonitor,
-//     powerMeter,
-//     speedCadenceSensor,
-// };
+const raceController = ReactiveConnectable({
+    deviceType: Device.raceController,
+    filter: webBle.filters.raceController(),
+});
+
+// Zweiter Pod für das Linke/Companion-Gerät
+const raceControllerCompanion = ReactiveConnectable({
+    deviceType: Device.raceControllerCompanion,
+    filter: webBle.filters.raceController(),
+});
+
+export {
+    controllable,
+    speedCadenceSensor,
+    heartRateMonitor,
+    powerMeter,
+    moxy,
+    coreTemp,
+    raceController, // <-- Hier ergänzen
+    raceControllerCompanion,
+};
 

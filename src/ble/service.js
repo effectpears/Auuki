@@ -1,4 +1,4 @@
-import { equals, exists, expect, compose2, dataviewToArray, print, } from '../functions.js';
+import { equals, exists, expect, compose2, dataviewToArray, print, wait, } from '../functions.js';
 import { webBle, uuids } from './web-ble.js';
 import { Characteristic } from './characteristic.js';
 
@@ -92,6 +92,11 @@ function Service(args = {}) {
     //
     const spec = args.spec ?? {};
 
+    // Int, ms — WinRT liefert die Characteristic-Liste direkt nach dem
+    // Connect oft leer oder partial; getCharacteristics retryet mit diesem
+    // Intervall (zwiftboard discoverServices: 3 Versuche, 750ms Pause)
+    const charRetryDelay = args.charRetryDelay ?? 750;
+
     // protocol is the configurable function where the specific steps for each
     // characteristcs initialization will be executed. For example FTMS needs
     // to receive unlock message before it will start transmitting and responding
@@ -169,7 +174,25 @@ function Service(args = {}) {
     // end accessors
 
     async function getCharacteristics() {
-        _gattCharacteristics = await _service.getCharacteristics();
+        // WinRT liefert die Characteristic-Liste direkt nach dem Connect
+        // oft leer oder partial (zwiftboard discoverServices: 3 Versuche
+        // mit 750ms Pause) — ohne Retry scheitert das Setup still und die
+        // UI zeigt 'connected', obwohl keine Notifications laufen.
+        let lastErr;
+        for (let i = 0; i < 3; i++) {
+            if (i > 0) await wait(charRetryDelay);
+            try {
+                _gattCharacteristics = await _service.getCharacteristics();
+            } catch (e) {
+                lastErr = e;
+                continue;
+            }
+            if (_gattCharacteristics.length > 0) break;
+            lastErr = new Error('no characteristics returned');
+        }
+        if (_gattCharacteristics.length === 0) {
+            throw lastErr ?? new Error('no characteristics returned');
+        }
         _characteristics = gattListToObject(_gattCharacteristics);
     }
 
@@ -179,7 +202,8 @@ function Service(args = {}) {
     async function start() {
         for(const key in spec) {
             characteristics[key] = Characteristic({
-                characteristic: _characteristics[spec[key].uuid]
+                characteristic: _characteristics[spec[key].uuid],
+                writeWithoutResponse: spec[key].writeWithoutResponse ?? false,
             });
 
             if(exists(spec[key].notify)) {

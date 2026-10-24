@@ -7,8 +7,14 @@ const services = {
     speedCadence:        '00001816-0000-1000-8000-00805f9b34fb',
     battery:             '0000180f-0000-1000-8000-00805f9b34fb',
     fec:                 '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e',
-    wahooFitnessMachine: 'a026ee0b-0a7d-4ab3-97fa-f1500f9feb8b',
     raceController:      '00000001-19ca-4651-86e5-fa29dcdd09d1',
+    // Zwift Service — neuere Click V2 Firmware exponiert die RCS-
+    // Characteristics (00000002/0003/0004-19ca-...) in diesem Service
+    // statt im 00000001-19ca-... Service (nRF-Dump: 0000fc82, Primary).
+    // zwiftboard matched die Characteristics nach UUID über alle Services
+    // hinweg — die Service-UUID ist dafür nicht nötig.
+    raceControllerZwift: '0000fc82-0000-1000-8000-00805f9b34fb',
+    wahooFitnessMachine: 'a026ee0b-0a7d-4ab3-97fa-f1500f9feb8b',
     smo2:                '6404d801-4cb9-11e8-b566-0800200c9a66',
     coreTemp:            '00002100-5b1e-4347-b07c-97b514dae121',
 };
@@ -84,6 +90,20 @@ function Filters() {
                 {services: [uuids.cyclingPower]},
             ],
             optionalServices: [uuids.heartRate]
+        };
+    }
+
+    function raceController() {
+        return {
+            filters: [
+                { name: 'Zwift Click' },
+                { name: 'Zwift Play' }
+            ],
+            optionalServices: [
+                uuids.raceController,
+                uuids.raceControllerZwift,
+                uuids.battery
+            ]
         };
     }
 
@@ -164,6 +184,7 @@ function Filters() {
         powerMeter,
         smo2,
         coreTemp,
+        raceController,
         all,
         generic,
     });

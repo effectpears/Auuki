@@ -1,4 +1,4 @@
-import { equals, exists, first, expect, compose2, time, print, } from '../functions.js';
+import { equals, exists, first, expect, compose2, time, wait, print, } from '../functions.js';
 import { Characteristic } from './characteristic.js';
 import { Service, serviceToString, gattListToObject, } from './service.js';
 import FTMS from './ftms/ftms.js';
@@ -9,6 +9,7 @@ import CSCS from './cscs/cscs.js';
 import HRS from './hrs/hrs.js';
 import BAS from './bas/bas.js';
 import RCS from './rcs/rcs.js';
+import { discoverRcsService, } from './rcs/discovery.js';
 import SMO2 from './moxy/smo2.js';
 import CoreTemp from './ct/ct.js';
 import { webBle, uuids } from './web-ble.js';
@@ -257,6 +258,13 @@ function Connectable(args = {}) {
         return _primaryServices[uuid];
     }
 
+    // Void -> BluetoothRemoteGATTService?
+    // der RCS-Service — der Pod kann ihn unter 00000001-19ca-... oder
+    // (neuere Firmware) unter 0000fc82-... (Zwift Service) exponieren
+    function getRcsService() {
+        return getService(uuids.raceController) ?? getService(uuids.raceControllerZwift);
+    }
+
     //
     // methods
     //
@@ -400,6 +408,20 @@ function Connectable(args = {}) {
         return maybeDevice;
     }
 
+    // Void -> Void
+    // stoppt alle laufenden Services (Keepalive-Intervalle, Idle-Reset-
+    // Timer, Notifications) und räumt das services-Objekt. Wird beim
+    // manuellen Disconnect UND beim unerwarteten Dropout aufgerufen —
+    // ohne das hier laufen bei jedem Reconnect Zombie-Keepalives auf toten
+    // Characteristics weiter (Write-Fehler-Flut, Console-Violations).
+    async function stopServices() {
+        const stopping = services;
+        services = {};
+        for (let key in stopping) {
+            await stopping[key]?.stop?.();
+        }
+    }
+
     async function disconnect() {
         if(!_connected) { return; }
 
@@ -411,9 +433,7 @@ function Connectable(args = {}) {
             let res = await services.trainer.reset();
         }
 
-        for(let key in services) {
-            await services[key].stop();
-        }
+        await stopServices();
 
         _connected = false;
         _status = Status.disconnected;
@@ -434,6 +454,13 @@ function Connectable(args = {}) {
     async function onDropout() {
         print.warn(`ble: dropout: ${_device.name}`);
 
+        // Zombie-Keepalives/-Idle-Resets der alten Session stoppen
+        // (zwiftboard: Session endet bei fehlgeschlagenem Keepalive-Write —
+        // Teardown + ReleaseAll). Ohne das hier laufen bei jedem Reconnect
+        // weitere Keepalive-Intervalle auf toten Characteristics weiter
+        // (Write-Fehler-Flut, Console-Violations).
+        stopServices();
+
         if(watchAdvertisementsSupported()) {
             connect({watching: true, requesting: false});
         } else {
@@ -452,6 +479,7 @@ function Connectable(args = {}) {
     // - setup Services by linking them to data callbacks
     //   and the raw gattService object
     async function defaultSetup() {
+        // Standard-Sensoren
         const hasFTMS = hasService(uuids.fitnessMachine);
         const hasFEC = hasService(uuids.fec);
         const hasWCPS = hasService(uuids.wahooFitnessMachine);
@@ -459,11 +487,77 @@ function Connectable(args = {}) {
         const hasCadence = hasService(uuids.speedCadence);
         const hasHeartRate = hasService(uuids.heartRate);
         const hasBattery = hasService(uuids.battery);
-        const hasRaceController = hasService(uuids.raceController);
         const hasSmo2 = hasService(uuids.smo2);
         const hasCoreTemp = hasService(uuids.coreTemp);
         const hasTrainerControl = hasFTMS || hasWCPS || hasFEC;
 
+// Sicherer Zugriff auf die Device-ID, falls vorhanden
+        const deviceId = (typeof _device !== 'undefined' && _device.id) ? _device.id : '';
+        const deviceName = getName() || '';
+
+        let hasRCS = hasService(uuids.raceController) || hasService(uuids.raceControllerZwift);
+
+        // Fallback (zwiftboard-Vorbild): Chrome liefert nach dem Connect
+        // oft nur eine partial Service-Liste (WinRT-Discovery-Timeout) und
+        // der Pod exponiert die RCS-Characteristics im Zwift Service
+        // 0000fc82 statt im erwarteten 00000001-19ca-... Service.
+        // Gezielte/characteristic-basierte Discovery statt Vertrauen auf
+        // die Liste.
+        if (!hasRCS && (getName() || '').includes('Zwift Click')) {
+            const svc = await discoverRcsService(_server, _primaryServices);
+            hasRCS = exists(svc);
+        }
+
+        // 1. Ist es der rechte Pod (über RCS-Dienst-Erkennung)?
+ if (hasRCS) {
+     _deviceType = Device.raceController;
+     print.log(`ble: connectable: setup: Zwift Click [Master / Recht] aktiv`);
+
+     const rcsService = getRcsService();
+
+     services['rcs'] = RCS({
+         service: rcsService,
+         onData: onData,
+     });
+
+     // Standard RCS Setup ausführen: startet die Notifications und
+     // führt intern protocol() aus (RideOn-Aktivierung, Keepalive,
+     // Idle-Reset). Ein doppelter protocol()-Aufruf wird hierdurch
+     // vermieden.
+     let setupRes = await services.rcs.setup();
+
+     if (!setupRes) {
+         print.warn(`ble: connectable: setup: Zwift Click [Master / Rechts] RCS setup fehlgeschlagen — keine Steuerung möglich (Characteristics fehlen oder Handshake fehlgeschlagen)`);
+     }
+
+     return setupRes;
+ }
+        
+        // 2. Ist es der linke Pod (als Zwift Click ohne RCS)?
+        if (deviceName.includes('Zwift Click')) {
+            _deviceType = Device.raceControllerCompanion;
+            print.log(`ble: connectable: setup: Zwift Click [Companion / Links] accepted`);
+
+            // Der linke Pod kann den RCS-Service exposieren (dann werden
+            // seine gespiegelten Button-Frames mit deduped — der shared
+            // heldCount im Measurement-Parser absorbiert den Mirror).
+            // Exponiert er ihn nicht, dient er nur als Verbindunganker.
+            if (hasRCS) {
+                const rcsService = getRcsService();
+                services['rcs'] = RCS({
+                    service: rcsService,
+                    onData: onData,
+                });
+                let setupRes = await services.rcs.setup();
+                if (!setupRes) {
+                    print.warn(`ble: connectable: setup: Zwift Click [Companion / Links] RCS setup fehlgeschlagen — Mirror-Dedup inaktiv`);
+                }
+                return setupRes;
+            }
+
+            return true;
+        }
+        // Restliche Standard-Logik für andere Sensoren (Trainer, Powermeter, etc.)...
         // Order here is important
         if(hasBattery) {
             services['bas'] = BAS({
@@ -550,18 +644,12 @@ function Connectable(args = {}) {
             return res;
         }
 
-        if(hasRaceController) {
-            // zwift click or play
-            _deviceType = Device.raceController;
-            print.log(`ble: connectable: setup: ${getDeviceType()}`);
-
-            services['rcs'] = RCS({
-                service: getService(uuids.raceController),
-                onData: onData,
-            });
-            let res = await services.rcs.setup();
-
-            return res;
+        if(hasBattery && !hasRCS && getName().includes('Zwift Click')) {
+            // Linker Pod oder Begleiter-Gerät ohne RCS-Dienst:
+            // Wir weisen ihm den Companion-Typ zu, falls er über diesen Schalter kam
+            _deviceType = _deviceType === Device.raceControllerCompanion ? Device.raceControllerCompanion : Device.generic;
+            print.log(`ble: connectable: setup: Zwift Click Companion/Left Pod accepted.`);
+            return true;
         }
 
         if(hasSmo2) {

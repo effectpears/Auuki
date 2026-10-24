@@ -1,4 +1,6 @@
-const cacheName = 'Flux-v008';
+// Bump bei jeder Änderung an den gecachten Dateien — der SW arbeitet
+// cache-first, ein alter Cache-Name liefert sonst die alte App-Version
+const cacheName = 'Flux-v009';
 const resources = [
     './',
     'index.html',
@@ -70,6 +72,7 @@ const resources = [
 
     'ble/rcs/race-controller-measurement.js',
     'ble/rcs/rcs.js',
+    'ble/rcs/discovery.js',
 
     'ble/wcps/control.js',
     'ble/wcps/wcps.js',

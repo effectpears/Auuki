@@ -11,6 +11,7 @@ const Device = {
     powerMeter: 'powerMeter',
     heartRateMonitor: 'heartRateMonitor',
     raceController: 'raceController',
+    raceControllerCompanion: 'raceControllerCompanion', // <--- HIER ERGÄNZEN
     smo2: 'smo2',
     coreTemp: 'coreTemp',
     generic: 'generic',

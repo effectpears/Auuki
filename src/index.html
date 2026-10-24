@@ -1046,6 +1046,59 @@
                         </div>
                     </div> <!-- end controlable settings -->
 
+                    <!-- race controller settings (Zwift Click) -->
+                    <div class="device-card">
+                        <div class="device-card--cont">
+                            <div class="device-card--header">
+                                <div></div>
+                                <div class="device-card--header--label">Zwift Click</div>
+                                <battery-level for="ble:raceController">
+                                    <div class="battery--level"></div>
+                                </battery-level>
+                            </div>
+                            <div class="device-card--body">
+                                <div class="device-card--body--row">
+                                    <!-- Linker Zwift Click (Companion / Zweit-Pod gegen Verbindungsabbruch) -->
+                                    <connection-switch for="ble:raceControllerCompanion"
+                                                        id="switch-race-controller-left"
+                                                        indicatorClass="connection-icon-switch--indicator"
+                                                        class="connection-icon-switch">
+                                        <svg class="connection-icon-switch--icon icon">
+                                            <use href="#icon--bluetooth"></use>
+                                        </svg>
+                                        <div class="connection-icon-switch--indicator off"></div>
+                                    </connection-switch>
+
+                                    <!-- Rechter Zwift Click (Hauptsteuerung mit RCS-Service) -->
+                                    <connection-switch for="ble:raceController"
+                                                        id="switch-race-controller"
+                                                        indicatorClass="connection-icon-switch--indicator"
+                                                        class="connection-icon-switch">
+                                        <svg class="connection-icon-switch--icon icon">
+                                            <use href="#icon--bluetooth"></use>
+                                        </svg>
+                                        <div class="connection-icon-switch--indicator off"></div>
+                                    </connection-switch>
+
+
+                                    <div class="device-card--tile">
+                                        <h3 class="device-card--tile--header">Name</h3>
+                                        <data-view class="data-view device-card--tile--value"
+                                                prop="ble:raceController:name">--</data-view>
+                                    </div>
+                                    <div class="device-card--tile">
+                                        <h3 class="device-card--tile--header">Action</h3>
+                                        <data-view class="data-view device-card--tile--value"
+                                                prop="ble:raceController:action">--</data-view>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div> 
+                    <!-- end race controller settings -->
+                    
+                    
+
                     <!-- power-meter settings -->
                     <div class="device-card">
                         <div class="device-card--cont">

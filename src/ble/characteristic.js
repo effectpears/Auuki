@@ -17,9 +17,15 @@ function Characteristic(args = {}) {
     // Function
     // some browsers don't have writeValueWithResponse,
     // but writeValue is depricated, so try the first or fallback to last.
-    const writterFn = exists(_characteristic.writeValueWithResponse) ?
-          'writeValueWithResponse' :
-          'writeValue';
+    // writeWithoutResponse (Write-Command) is bevorzugt wenn konfiguriert —
+    // der Zwift Click V2 SyncRX erwartet das (zwiftboard writeChar:
+    // WriteWithoutResponse zuerst, Fallback mit Response).
+    const writterFn = (args.writeWithoutResponse ?? false) &&
+          exists(_characteristic.writeValueWithoutResponse) ?
+          'writeValueWithoutResponse' :
+          (exists(_characteristic.writeValueWithResponse) ?
+              'writeValueWithResponse' :
+              'writeValue');
 
     // Int, ms
     const responseTimeout = args.responseTimeout ?? 1000;
